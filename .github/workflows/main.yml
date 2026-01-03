@@ -1,0 +1,42 @@
+name: Radar Bot Runner
+
+# متى يعمل البوت؟
+on:
+  # 1. التشغيل المجدول (كل 4 ساعات)
+  schedule:
+    - cron: '0 */4 * * *'
+  
+  # 2. زر تشغيل يدوي (للتجربة متى شئت)
+  workflow_dispatch:
+
+jobs:
+  run-news-bot:
+    runs_on: ubuntu-latest
+    
+    steps:
+      # 1. تحميل ملفات المشروع
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # 2. تجهيز بايثون
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      # 3. تثبيت المكتبات
+      - name: Install dependencies
+        run: |
+          pip install requests google-generativeai python-dotenv
+
+      # 4. تشغيل البوت (مع تمرير المفاتيح السرية)
+      - name: Run Bot Script
+        env:
+          BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+          NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+          FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
+          SPORT_CHANNEL_ID: ${{ secrets.SPORT_CHANNEL_ID }}
+          TECH_CHANNEL_ID: ${{ secrets.TECH_CHANNEL_ID }}
+          MIX_CHANNEL_ID: ${{ secrets.MIX_CHANNEL_ID }}
+        run: python main.py
