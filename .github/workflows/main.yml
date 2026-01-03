@@ -1,30 +1,31 @@
-name: Radar Bot System
+name: 🤖 Radar Pro - النشر الذكي
 
 on:
   schedule:
-    - cron: '0 */4 * * *'  # كل 4 ساعات
-  workflow_dispatch:       # زر يدوي
-  push:                    # عند تعديل الملفات
+    - cron: '0 */3 * * *'  # كل 3 ساعات
+  workflow_dispatch:
+  push:
     branches: [ "main" ]
 
 jobs:
   run-radar:
-    runs-on: ubuntu-latest  # ✅ هنا التصحيح: شرطة عادية وليست سفلية
-
+    runs-on: ubuntu-latest
+    
     steps:
-      - name: Checkout code
+      - name: 📥 تحميل الكود
         uses: actions/checkout@v3
-
-      - name: Set up Python
+        
+      - name: 🐍 إعداد بايثون
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
-
-      - name: Install dependencies
+          
+      - name: 📦 تثبيت المكتبات
         run: |
-          pip install requests google-generativeai python-dotenv Pillow
-
-      - name: Start Radar Bot
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          
+      - name: 🚀 تشغيل الرادار المتطور
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
@@ -32,5 +33,6 @@ jobs:
           FOOTBALL_DATA_KEY: ${{ secrets.FOOTBALL_DATA_KEY }}
           SPORT_CHANNEL_ID: ${{ secrets.SPORT_CHANNEL_ID }}
           TECH_CHANNEL_ID: ${{ secrets.TECH_CHANNEL_ID }}
-          MIX_CHANNEL_ID: ${{ secrets.MIX_CHANNEL_ID }}
+          ECONOMY_CHANNEL_ID: ${{ secrets.ECONOMY_CHANNEL_ID }}
+          ADMIN_ID: ${{ secrets.ADMIN_ID }}
         run: python main.py
