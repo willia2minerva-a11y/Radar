@@ -1,32 +1,41 @@
-name: Goalixy Bot Runner
+name: Radar Bot System
 
+# متى يعمل الرادار؟
 on:
+  # 1. المجدول: يعمل كل 4 ساعات تلقائياً
   schedule:
-    - cron: '0 */4 * * *'  # تشغيل كل 4 ساعات
-  workflow_dispatch:       # زر تشغيل يدوي
+    - cron: '0 */4 * * *'
+  
+  # 2. التلقائي: يعمل فوراً عند رفع أي ملف جديد أو تعديل (Push)
+  push:
+    branches: [ "main" ]
+
+  # 3. اليدوي: زر للتشغيل في أي وقت
+  workflow_dispatch:
 
 jobs:
-  run-news-bot:
-    runs-on: ubuntu-latest  # <--- هنا كان الخطأ، تم تصحيحه إلى شرطة عادية
+  run-radar:
+    # التصحيح هنا: استخدام الشرطة العادية (-) وليس السفلية (_)
+    runs-on: ubuntu-latest
 
     steps:
-      # 1. تحميل ملفات المشروع
+      # تحميل الكود
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # 2. تجهيز بايثون
+      # إعداد بايثون
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # 3. تثبيت المكتبات
+      # تثبيت المكتبات
       - name: Install dependencies
         run: |
           pip install requests google-generativeai python-dotenv
 
-      # 4. تشغيل البوت (تمرير المفاتيح السرية)
-      - name: Run Bot Script
+      # تشغيل الرادار مع تمرير المفاتيح
+      - name: Start Radar Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
