@@ -1,7 +1,7 @@
 import requests
 import google.generativeai as genai
-import time
-from config import GEMINI_API_KEY, IDENTITIES, BOT_TOKEN
+import os
+from config import GEMINI_API_KEY, IDENTITIES, BOT_TOKEN, FOOTBALL_KEY
 
 # إعداد Gemini
 if GEMINI_API_KEY:
@@ -10,55 +10,98 @@ if GEMINI_API_KEY:
 
 def get_readable_content(data):
     """
-    دالة ذكية تحاول استخراج النص المفيد من أشكال JSON المختلفة
+    دالة لاستخراج المحتوى المفيد سواء كان خبراً أو جدول مباريات
     """
     content = ""
-    # التعامل مع NewsAPI
-    if "articles" in data and len(data["articles"]) > 0:
-        item = data["articles"][0] # نأخذ أحدث خبر
-        content = f"العنوان: {item.get('title')}\nالوصف: {item.get('description')}"
     
-    # التعامل مع TheSportsDB
-    elif "events" in data and data["events"]:
-        item = data["events"][0]
-        content = f"مباراة: {item.get('strEvent')}\nالوقت: {item.get('strTime')}"
+    # --- الحالة 1: بيانات مباريات (من Football-Data.org) ---
+    if "matches" in data:
+        matches = data["matches"]
+        if not matches:
+            return "NO_MATCHES" # علامة خاصة لنعرف أنه لا توجد مباريات
         
-    return content
+        # نأخذ أهم 10 مباريات فقط
+        match_list = []
+        for match in matches[:10]:
+            home = match['homeTeam']['name']
+            away = match['awayTeam']['name']
+            time = match['utcDate'] # التوقيت الخام
+            league = match['competition']['name']
+            # نبني سطراً واحداً لكل مباراة
+            match_list.append(f"Match: {home} vs {away} | League: {league} | Time: {time}")
+        
+        return "Raw Match Schedule:\n" + "\n".join(match_list)
+
+    # --- الحالة 2: أخبار ومقالات (من NewsAPI) ---
+    elif "articles" in data and len(data["articles"]) > 0:
+        # نأخذ أول خبر متاح
+        item = data["articles"][0]
+        title = item.get('title', 'No Title')
+        desc = item.get('description', '')
+        return f"News Title: {title}\nDetails: {desc}"
+    
+    return None
 
 def smart_fetch_and_process(api_list, channel_type):
     """
-    1. تجرب الروابط بالترتيب
-    2. تستخرج النص
-    3. ترسله لجميني
+    المحرك الرئيسي: يجلب البيانات، يحللها، ويرسلها لـ Gemini
     """
     raw_text = None
     
-    # 1. جلب البيانات (Failover System)
+    # 1. الدوران على المصادر (Failover)
     for url in api_list:
         try:
-            print(f"[{channel_type}] جاري الاتصال بـ: {url}...")
-            response = requests.get(url, timeout=15)
+            headers = {}
+            # إذا كان الرابط هو Football-Data، نضيف المفتاح في الهيدر
+            if "football-data.org" in url:
+                headers = {'X-Auth-Token': FOOTBALL_KEY}
+                print(f"[{channel_type}] محاولة جلب جدول المباريات...")
+            else:
+                print(f"[{channel_type}] محاولة جلب أخبار من المصدر...")
+
+            # طلب البيانات
+            response = requests.get(url, headers=headers, timeout=15)
+            
             if response.status_code == 200:
                 data = response.json()
-                raw_text = get_readable_content(data)
-                if raw_text:
-                    break # وجدنا بيانات، نوقف البحث
+                extracted_text = get_readable_content(data)
+                
+                # إذا كانت النتيجة "لا توجد مباريات"، نتجاوز هذا المصدر ونذهب للتالي
+                if extracted_text == "NO_MATCHES":
+                    print(f"[{channel_type}] لا توجد مباريات مجدولة الآن، الانتقال للمصدر التالي...")
+                    continue
+                
+                # إذا وجدنا نصاً حقيقياً، نعتمد عليه ونوقف البحث
+                if extracted_text:
+                    raw_text = extracted_text
+                    break
+            else:
+                print(f"فشل المصدر (Code {response.status_code})")
+
         except Exception as e:
-            print(f"خطأ في الرابط: {e}")
+            print(f"خطأ في الاتصال: {e}")
             continue
 
+    # إذا انتهت القائمة ولم نجد شيئاً
     if not raw_text:
-        print(f"[{channel_type}] فشلت كل المصادر في جلب بيانات.")
+        print(f"[{channel_type}] فشلت جميع المصادر في جلب محتوى.")
         return None
 
     # 2. المعالجة بـ Gemini
     try:
-        print(f"[{channel_type}] جاري المعالجة بالذكاء الاصطناعي...")
-        identity = IDENTITIES.get(channel_type, IDENTITIES["mix"])
-        prompt = f"{identity}\n\nالبيانات الخام:\n{raw_text}"
+        print(f"[{channel_type}] جاري الصياغة عبر Gemini...")
+        identity = IDENTITIES.get(channel_type, IDENTITIES["economy"])
         
-        ai_response = model.generate_content(prompt)
+        # تعليمات إضافية خاصة بالمباريات
+        extra_instructions = ""
+        if "Match Schedule" in raw_text:
+            extra_instructions = "\nهام: هذه مواعيد مباريات UTC. حولها لتوقيت السعودية (+3) واعرضها بصيغة (00:00 م/ص). رتبها كقائمة جميلة."
+
+        full_prompt = f"{identity}\n{extra_instructions}\n\nالبيانات الخام:\n{raw_text}"
+        
+        ai_response = model.generate_content(full_prompt)
         return ai_response.text
+        
     except Exception as e:
         print(f"خطأ في Gemini: {e}")
         return None
@@ -71,7 +114,7 @@ def send_to_telegram(text, channel_id):
     payload = {
         "chat_id": channel_id,
         "text": text,
-        "parse_mode": "Markdown" # أو HTML
+        "parse_mode": "Markdown" # تأكد أن Gemini لا يستخدم رموزاً تكسر المارك داون
     }
     try:
         requests.post(url, data=payload)
