@@ -1,40 +1,29 @@
 name: Radar Bot System
 
-# متى يعمل الرادار؟
 on:
-  # 1. المجدول: يعمل كل 4 ساعات تلقائياً
   schedule:
-    - cron: '0 */4 * * *'
-  
-  # 2. التلقائي: يعمل فوراً عند رفع أي ملف جديد أو تعديل (Push)
-  push:
+    - cron: '0 */4 * * *'  # كل 4 ساعات
+  workflow_dispatch:       # زر يدوي
+  push:                    # عند تعديل الملفات
     branches: [ "main" ]
-
-  # 3. اليدوي: زر للتشغيل في أي وقت
-  workflow_dispatch:
 
 jobs:
   run-radar:
-    # التصحيح هنا: استخدام الشرطة العادية (-) وليس السفلية (_)
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest  # ✅ هنا التصحيح: شرطة عادية وليست سفلية
 
     steps:
-      # تحميل الكود
       - name: Checkout code
         uses: actions/checkout@v3
 
-      # إعداد بايثون
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # تثبيت المكتبات
       - name: Install dependencies
         run: |
-          pip install requests google-generativeai python-dotenv
+          pip install requests google-generativeai python-dotenv Pillow
 
-      # تشغيل الرادار مع تمرير المفاتيح
       - name: Start Radar Bot
         env:
           BOT_TOKEN: ${{ secrets.BOT_TOKEN }}
