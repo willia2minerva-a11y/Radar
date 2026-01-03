@@ -1,4 +1,7 @@
-requests
+requests>=2.32.0
 google-generativeai>=0.8.3
-python-dotenv
-Pillow
+python-dotenv>=1.0.0
+Pillow>=10.3.0
+telebot>=0.0.5
+schedule>=1.2.1
+beautifulsoup4>=4.12.0
