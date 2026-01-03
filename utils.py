@@ -2,10 +2,8 @@ import requests
 import google.generativeai as genai
 import os
 import time
-from config import IDENTITIES, BOT_TOKEN, FOOTBALL_KEY
-
-# لاحظ: لم نعد نهيئ Gemini هنا في البداية
-# سنقوم بذلك ديناميكياً داخل الدالة
+# التصحيح هنا: حذفنا FOOTBALL_KEY من هذا السطر
+from config import IDENTITIES, BOT_TOKEN
 
 def get_keys_list(env_var_name):
     """جلب قائمة المفاتيح من متغيرات البيئة مفصولة بفواصل"""
@@ -36,9 +34,7 @@ def get_readable_content(data):
     return None
 
 def call_gemini_with_failover(prompt):
-    """
-    دالة خاصة لتجربة مفاتيح Gemini واحداً تلو الآخر
-    """
+    """دالة خاصة لتجربة مفاتيح Gemini واحداً تلو الآخر"""
     gemini_keys = get_keys_list("GEMINI_API_KEY")
     
     if not gemini_keys:
@@ -48,28 +44,19 @@ def call_gemini_with_failover(prompt):
     for i, key in enumerate(gemini_keys):
         try:
             print(f"🤖 محاولة معالجة Gemini بالمفتاح رقم {i+1}...")
-            
-            # 1. إعداد المفتاح الحالي
             genai.configure(api_key=key)
             model = genai.GenerativeModel('gemini-pro')
-            
-            # 2. التوليد
             response = model.generate_content(prompt)
-            
-            # إذا نجحنا، نرجع النص ونخرج من الدالة
             return response.text
 
         except Exception as e:
-            # هنا نلتقط أخطاء غيميني (مثل Quota Exceeded)
             error_msg = str(e)
             if "429" in error_msg or "Resource has been exhausted" in error_msg:
-                print(f"⚠️ مفتاح Gemini رقم {i+1} انتهى رصيده (Quota Exceeded). الانتقال للتالي...")
+                print(f"⚠️ مفتاح Gemini رقم {i+1} انتهى رصيده. الانتقال للتالي...")
             elif "API_KEY_INVALID" in error_msg:
                 print(f"⚠️ مفتاح Gemini رقم {i+1} غير صالح.")
             else:
                 print(f"❌ خطأ غير متوقع في Gemini مع المفتاح {i+1}: {e}")
-            
-            # استراحة قصيرة جداً قبل تجربة المفتاح التالي
             time.sleep(1)
             continue
     
@@ -80,9 +67,9 @@ def smart_fetch_and_process(api_list, channel_type):
     """المحرك الرئيسي"""
     raw_text = None
     
-    # --- المرحلة 1: جلب البيانات (كما هي سابقاً) ---
+    # جلب المفاتيح من البيئة مباشرة هنا
     news_keys = get_keys_list("NEWS_API_KEY")
-    football_keys = get_keys_list("FOOTBALL_DATA_KEY")
+    football_keys = get_keys_list("FOOTBALL_DATA_KEY") # التأكد من الاسم الصحيح في Secrets
 
     for url_template in api_list:
         if "football-data.org" in url_template:
@@ -124,7 +111,7 @@ def smart_fetch_and_process(api_list, channel_type):
         print(f"🚫 [{channel_type}] لم يتم العثور على محتوى.")
         return None
 
-    # --- المرحلة 2: المعالجة (استخدام الدالة الجديدة) ---
+    # المعالجة
     identity = IDENTITIES.get(channel_type, "")
     extra_prompt = ""
     if "Match Schedule" in raw_text:
@@ -132,7 +119,6 @@ def smart_fetch_and_process(api_list, channel_type):
 
     full_prompt = f"{identity}{extra_prompt}\n\nالبيانات:\n{raw_text}"
     
-    # استدعاء دالة تعدد المفاتيح
     return call_gemini_with_failover(full_prompt)
 
 def send_to_telegram(text, channel_id):
